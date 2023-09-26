@@ -189,12 +189,10 @@ clientData.subscriptionPlans[0].setUpAmount : 0;
     client_id: clientId,
     renewal_id: updatedClient.subscriptionPlans[0].renewals[0]._id.toString(),
     title: 'Subscription Plan',
-
-    ///////////////================ invoice ki length kam karni hai ====================/////////////////////
-    invoiceNumber: 'INV-' + new Date().getFullYear() + '-' + '00' + payment._renewalId.slice(0, 4),
+    invoiceNumber: 'INV-' + new Date().getFullYear() + '-' + '00' + payment._renewalId.length,
     invoiceDate: new Date(),
     paymentDate: new Date(),
-    amount: payment.amount,
+    amount: subscriptionApiResponse?.data?.billing_info?.last_payment?.amount?.value,
     paidStatus: true,
     GST: subscriptionPlanDetail?.data?.taxes?.percentage,
     email: subscriptionApiResponse?.data?.subscriber?.email_address,
@@ -256,9 +254,28 @@ await invoiceService.addInvoice(userPerformer,invoiceData);
       return subscriptionApiResponse.data;
     } catch (error) {
       console.error("Error creating plan:", error);
-      ApiError.badRequest(error.message);
+     return  ApiError.badRequest(error.message);
     }
   }
+
+async webhook(data){
+  try {
+
+   
+   
+  } catch (error) {
+   return  ApiError.badRequest(error.message);
+  }
+
+
 }
+
+
+ 
+
+}
+
+
+
 
 module.exports = new paypalSubscriptionService();

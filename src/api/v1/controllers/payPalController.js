@@ -47,9 +47,17 @@ const cancelRenewal = async (req, res) => {
   }
 };
 
+const webhook = async (req, res) => {
+  const data = req.body;
+  const  webhookResponse = await paypalService.webhook(data)
+
+
+}
+
 
 module.exports = {
   performPayPalActions,
   completeSubscription,
   cancelRenewal,
+  webhook
 };

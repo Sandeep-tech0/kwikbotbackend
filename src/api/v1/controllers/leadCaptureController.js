@@ -96,8 +96,21 @@ async function deleteLeadCaptureById(req, res) {
 async function sendNewLeadMail(req, res) {
   try {
     const leadBody = req.body;
-    await LeadsCaptureService.sendLeadMail(leadBody.email, leadBody.name, leadBody.phone);
+    await LeadsCaptureService.sendLeadMail(
+      leadBody.email,
+      leadBody.name,
+      leadBody.phone
+    );
     return Response.success(res, "Mail sent successfully");
+  } catch (error) {
+    return Response.error(res, error);
+  }
+}
+
+async function getAllLeadData(req, res) {
+  try {
+    const leaddata = await LeadsCaptureService.getLeadData();
+    return Response.success(res, "All Lead Data", leaddata);
   } catch (error) {
     return Response.error(res, error);
   }
@@ -109,5 +122,6 @@ module.exports = {
   getLeadCaptureById,
   updateLeadCaptureById,
   deleteLeadCaptureById,
-  sendNewLeadMail
+  sendNewLeadMail,
+  getAllLeadData,
 };

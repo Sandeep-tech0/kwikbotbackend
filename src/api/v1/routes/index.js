@@ -14,7 +14,7 @@ const renewal = require('./renewal')
 const payment = require('./payment')
 const leadCapture = require('./leadCapture')
 const paypal = require('./payPal')
-
+const webhook = require('./webhook')
 
 module.exports = function (app) {
   app.use(express.json());
@@ -38,5 +38,6 @@ module.exports = function (app) {
   app.use(ENDPOINT + `/payments`, payment);
   app.use(ENDPOINT + `/lead-captures`, leadCapture);
   app.use(ENDPOINT + `/pay-pal`, paypal);
+  app.use(ENDPOINT + `/webhook`, webhook);
 
 };

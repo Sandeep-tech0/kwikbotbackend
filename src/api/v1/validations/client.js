@@ -32,10 +32,6 @@ class ClientValidation {
       
         if (!client.client.subscriptionPlans[0].frequency)
           return ApiError.badRequest('Subscription Plan frequency is required');
-      
-        if (!client.client.subscriptionPlans[0].currency)
-          throw ApiError.badRequest('Subscription Plan currency is required');
-      
         if (!client.client.subscriptionPlans[0].amount)
           throw ApiError.badRequest('Subscription Plan amount is required');
       

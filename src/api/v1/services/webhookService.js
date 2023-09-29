@@ -1,100 +1,118 @@
 const ApiError = require("../middlewares/apiError");
+const { verifySignature } = require("../middlewares/webhook");
+const clientModel = require("../models/Client");
 const paypalTokenController = require("../middlewares/paypalToken");
 const axios = require("axios");
-const clientModel = require("../models/Client");
 const invoiceService = require("../services/invoiceService");
+const userModel = require("../models/User");
 
-class paypalSubscriptionService {
-  async createPlan(clientId) {
-    const clientData = await clientModel
-      .findById(clientId)
-      .select("subscriptionPlans")
-      .lean();
-  
-    if (!clientData) {
-      throw new Error("Client not found");
-    }
-  
+class webhookService {
+
+  async webhookSubscriptionCancelled(data, headers) {
     try {
-      const token = await paypalTokenController.createToken();
-  
-      const updatedFrequency =
-        clientData.subscriptionPlans[0].frequency === "Monthly" ? "MONTH" : "YEAR";
-  
-      const setupfeeValue =
-        clientData.subscriptionPlans[0].isSetUpAmountApplicable === true
-          ? clientData.subscriptionPlans[0].setUpAmount
-          : 0;
-  
-      // Define the request data in the correct structure
-      const requestData = {
-        product_id: "1695106714",
-        name: clientData.subscriptionPlans[0].planName,
-        description: "-",
-        status: "ACTIVE",
-        billing_cycles: [
-          {
-            frequency: {
-              interval_unit: updatedFrequency,
-              interval_count: 1,
-            },
-            tenure_type: "REGULAR",
-            sequence: 1,
-            total_cycles: 0,
-            pricing_scheme: {
-              fixed_price: {
-                value: clientData.subscriptionPlans[0].amount,
-                currency_code: "USD",
-              },
-            },
-          },
-        ],
-        payment_preferences: {
-          auto_bill_outstanding: true,
-          setup_fee: {
-            value: setupfeeValue,
-            currency_code: "USD",
-          },
-          setup_fee_failure_action: "CONTINUE",
-          payment_failure_threshold: 3,
-        },
-        taxes: {
-          percentage: "10",
-          inclusive: false,
-        },
-      };
-  
-      console.log("requestData", requestData);
-  
-      const apiresponse = await axios.post(
-        `https://api-m.sandbox.paypal.com/v1/billing/plans`,
-        requestData,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "PayPal-Request-Id": "5329613a-2575-441b-bf68-ba8d4e287180",
-            Prefer: "return=representation",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-  
-      return apiresponse.data;
+      console.log("webhookSubscriptionCancelled", data);
+      console.log("webhook header", headers);
+      const verifiedSignature = await verifySignature(headers, data);
+
+      if (!verifiedSignature) {
+        return ApiError.badRequest("Invalid webhook received");
+      }
     } catch (error) {
-      console.error("Error creating plan:", error);
-      return ApiError.badRequest(error.message);
+      throw error;
     }
   }
-  
 
-  async completeSubscription({
-    subscriptionID,
-    orderID,
-    clientId,
-    userPerformer,
-  }) {
+
+  async webhookSubscriptionExpired(headers, data) {
     try {
+      console.log("webhookSubscriptionExpired", data);
+      const verifiedSignature = await verifySignature(headers, data);
+
+      if (!verifiedSignature) {
+        return ApiError.badRequest("Invalid webhook received");
+      }
+
+      const subscription_id = data.resource.id;
+    /////====================== when plan expired then is active false and isRenew false and isCancelled true is to be updated in client model inside renewals array  ======================/////
+      const updatedClient = await clientModel
+        .findOneAndUpdate(
+          { "subscriptionPlans.renewals.subscription_id": subscription_id },
+          {
+            $set: {
+              "subscriptionPlans.$.renewals.$[innerRenewal].isCancelled": true,
+              "subscriptionPlans.$.renewals.$[innerRenewal].cancellationDate":
+                new Date(),
+              "subscriptionPlans.$.renewals.$[innerRenewal].isActive": false,
+              "renewals.$.isRenew": false,
+            },
+          },
+          { new: true }
+        )
+        .exec();
+      if (!updatedClient) {
+        throw new Error("Client not found");
+      }
+      return updatedClient;
+
+    } catch (error) {
+      return ApiError.badRequest("Invalid webhook received", error.message);
+    }
+  }
+
+
+
+  async webhookSubscriptionSuspended(headers, data) {
+    try {
+      console.log("webhookSubscriptionSuspended", data);
+      const verifiedSignature = await verifySignature(headers, data);
+
+      if (!verifiedSignature) {
+        return ApiError.badRequest("Invalid webhook received");
+      }
+
+      const subscription_id = data.resource.id;
+
+      const updatedClient = await clientModel
+      .findOneAndUpdate(
+        { "subscriptionPlans.renewals.subscription_id": subscription_id },
+        {
+          $set: {
+            "subscriptionPlans.$.renewals.$[innerRenewal].isCancelled": true,
+            "subscriptionPlans.$.renewals.$[innerRenewal].cancellationDate":
+              new Date(),
+            "subscriptionPlans.$.renewals.$[innerRenewal].isActive": false,
+            "renewals.$.isRenew": false,
+          },
+        },
+        { new: true }
+      )
+      .exec();
+      if (!updatedClient) {
+        throw new Error("Client not found");
+      }
+      return updatedClient;
+    } catch (error) {
+      return ApiError.badRequest("Invalid webhook received", error.message);
+    }
+  }
+
+
+  async webhookSubscriptionComplete(headers, data) {
+    try {
+  
+      const verifiedSignature = await verifySignature(headers, data);
+      if (!verifiedSignature) {
+        return ApiError.badRequest("Invalid webhook received");
+      }
+
+      const subscriptionID = data.resource.billing_agreement_id ;  
+      // const subscriptionID = "I-Y01DVJUBY8EW"  ;
+      // const amount = data.resource.amount.total;
+      const orderID = data.resource.id  ;
+      // const orderID = "1JP832788F798320U" ;
+
       const token = await paypalTokenController.createToken();
+
       const orderApiResponse = await axios.get(
         `https://api-m.sandbox.paypal.com/v2/checkout/orders/${orderID}`,
         {
@@ -104,7 +122,7 @@ class paypalSubscriptionService {
           },
         }
       );
-
+console.log("orderApiResponse",orderApiResponse);
       const subscriptionApiResponse = await axios.get(
         `https://api-m.sandbox.paypal.com/v1/billing/subscriptions/${subscriptionID}`,
         {
@@ -165,7 +183,7 @@ class paypalSubscriptionService {
       const updatedClient = await clientModel
         .findOneAndUpdate(
           {
-            _id: clientId,
+            "subscriptionPlans.renewals.subscription_id": subscriptionID,
             isDeleted: false,
           },
           {
@@ -174,9 +192,11 @@ class paypalSubscriptionService {
           },
           { new: true }
         )
-        .select("subscriptionPlans")
+        .populate("users")
+        .select("subscriptionPlans users")
         .lean();
 
+        console.log("updatedClient",updatedClient);
       if (!updatedClient) {
         throw new Error("Client not found");
       }
@@ -202,15 +222,23 @@ class paypalSubscriptionService {
       };
  await clientModel
         .findOneAndUpdate(
-          { _id: clientId, isDeleted: false },
+          {  "subscriptionPlans.renewals.subscription_id": subscriptionID
+            , isDeleted: false },
           {
             $push: { payments: payment },
           },
           { new: true }
         )
         .lean();
+        console.log("payment",payment);
 
       //////////////////////////////////=================invoice===================///////////////////////////
+      const clientId = updatedClient._id.toString();
+      const userPerformer = updatedClient.users[0];
+  
+      if (!userPerformer) {
+        throw new Error("Performer not found");
+      }
 
       const invoiceData = {
         client_id: clientId,
@@ -245,65 +273,25 @@ class paypalSubscriptionService {
         PlanDetails: subscriptionPlanDetail?.data,
       };
     } catch (error) {
-      console.error("Error creating plan:", error);
-      return ApiError.badRequest(error.message);
+      return ApiError.badRequest("Invalid webhook received", error.message);
     }
   }
 
-  async cancelRenewal(data) {
+
+
+  async webhookSubscriptionPaymentFailed(headers, data) {
     try {
-      const { subscriptionID, clientId, renewalId } = data;
-      const token = await paypalTokenController.createToken();
-      const subscriptionApiResponse = await axios.get(
-        `https://api-m.sandbox.paypal.com/v1/billing/subscriptions/${subscriptionID}`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const updatedClient = await clientModel
-        .findOneAndUpdate(
-          {
-            _id: clientId,
-            isDeleted: false,
-            "subscriptionPlans.renewals._id": renewalId,
-          },
-          {
-            $set: {
-              "subscriptionPlans.$.renewals.$[innerRenewal].isCancelled": true,
-              "subscriptionPlans.$.renewals.$[innerRenewal].cancellationDate":
-                new Date(),
-              "subscriptionPlans.$.isRenew": false,
-            },
-          },
-          {
-            new: true,
-            arrayFilters: [{ "innerRenewal._id": renewalId }],
-          }
-        )
-        .select("subscriptionPlans")
-        .lean();
-
-      if (!updatedClient) {
-        throw new Error("Client not found");
+      console.log("webhookSubscriptionPaymentFailed", data);
+      const verifiedSignature = await verifySignature(headers, data);
+      if (!verifiedSignature) {
+        return ApiError.badRequest("Invalid webhook received");
       }
+      const subscription_id = data.resource.id;
 
-      return subscriptionApiResponse.data;
     } catch (error) {
-      console.error("Error creating plan:", error);
-      return ApiError.badRequest(error.message);
-    }
-  }
-
-  async webhook(data) {
-    try {
-    } catch (error) {
-      return ApiError.badRequest(error.message);
+      return ApiError.badRequest("Invalid webhook received", error.message);
     }
   }
 }
 
-module.exports = new paypalSubscriptionService();
+module.exports = new webhookService();

@@ -179,6 +179,7 @@ class SubscriptionPlanService {
             subcription.cancellationReason,
           "subscriptionPlans.$.fullReason": subcription.fullReason,
           "subscriptionPlans.$.cancellationDate": new Date(),
+          "subsciptionPlans.$.isRenew": false,
         },
       },
       { new: true }

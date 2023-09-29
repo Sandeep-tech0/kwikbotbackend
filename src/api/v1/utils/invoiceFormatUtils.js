@@ -5,9 +5,11 @@ class InvoiceUtils {
   static getHtml(invoice, userPerformer) {
     const imageLink = "https://kwikbot.ai/images/kwikbot-bran-logo.png"
     const invoiceDate = moment(invoice.invoiceDate).format("DD MMM YYYY");
-    const GSTamount = invoice.amount * (invoice.GST / 100);
-    const totalAmount = parseInt(invoice.amount) + parseInt(GSTamount);
+    const GSTamount = invoice.amount * 0.1;
+    const totalAmount = invoice.amount
     const AmountInWords = this.convertNumberToWords(totalAmount);
+    const intialAmount = invoice.amount - GSTamount; 
+
 
     return `<!DOCTYPE html>
     <html lang="en">
@@ -74,7 +76,7 @@ class InvoiceUtils {
                            <td style="padding: 20px; border-bottom: 1px solid #cccc;" colspan="4">
                             <p> <b>${invoice.title}</b> </p>
                             <p> ${userPerformer.country}</p>
-                            <p>${invoice.email}</p>
+                            <p>${userPerformer.email}</p>
                            </td>
                        </tr>
 
@@ -91,9 +93,9 @@ class InvoiceUtils {
                                              <td style="padding: 20px; border-right: 1px solid #cccccc; border-bottom: 1px solid #cccc;">Amt</td>
                                         </tr>
                                         <tr>
-                                            <td style="padding: 20px; border-bottom: 1px solid #cccccc; border-right: 1px solid #cccccc;"><p>${invoice.amount}</p></td>
+                                            <td style="padding: 20px; border-bottom: 1px solid #cccccc; border-right: 1px solid #cccccc;"><p>${intialAmount}</p></td>
+                                            <td style="padding: 20px; border-right: 1px solid #cccccc; border-bottom: 1px solid #cccccc;"  ><p>10%</p></td>
                                             <td style="padding: 20px; border-right: 1px solid #cccccc; border-bottom: 1px solid #cccccc;"  ><p>${GSTamount}</p></td>
-                                            <td style="padding: 20px; border-right: 1px solid #cccccc; border-bottom: 1px solid #cccccc;"  ><p>0</p></td>
                                             <td style="padding: 20px; border-right: 1px solid #cccccc; border-bottom: 1px solid #cccccc;"  ><p>${totalAmount}</p></td>
                                         </tr>
                                      </table>

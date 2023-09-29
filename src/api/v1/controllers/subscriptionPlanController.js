@@ -53,6 +53,8 @@ async function CancelClientSubscription(req, res) {
         subcription,
         clientId
       );
+
+      console.log( "cancel renewal respone",updatedSubscription);
     return Response.success(
       res,
       "Subscription updated successfully",

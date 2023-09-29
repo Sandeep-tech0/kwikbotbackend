@@ -79,10 +79,11 @@ const ClientSchema = new mongoose.Schema([
       },
     },
     subscriptionPlans: [
+
       {
         planName: {
           type: String,
-       
+        default: "Basic Plan",
         },
         planId: {
           type: String
@@ -94,7 +95,7 @@ const ClientSchema = new mongoose.Schema([
         },
         currency: {
           type: String,
-          required: true,
+          default: "USD",
         },
         amount: {
           type: Number,
@@ -143,6 +144,9 @@ const ClientSchema = new mongoose.Schema([
         updatedAt: {
           type: Date,
           default: Date.now,
+        },
+        isRenew: {
+          type: Boolean,
         },
         description: [
           {

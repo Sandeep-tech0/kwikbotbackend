@@ -123,7 +123,7 @@ class LeadsCaptureService {
 
     //const mailResult = await SMTPMailService.sendMail(email, 'New Lead', `Name: ${name} \n Email: ${email} \n Phone: ${phone}`);
     //SMTPMailService.sendMail('info@acompworld.com', 'New Lead', `Name: ${name} \n Email: ${email} \n Phone: ${phone}`);
-    SMTPMailService.sendMail("info@acompworld.com", "New Lead", mailHTMLBody);
+    SMTPMailService.sendMail("info@acompworld.com", "New Lead - (kwikbot)", mailHTMLBody);
 
     const leadData = {
       name,

@@ -21,7 +21,7 @@ class InvoiceService {
   async addInvoice(userPerformer, invoice) {
     const finalClientId = invoice.client_id || userPerformer.clientId;
 
-     const html = invoiceFormatUtils.InvoiceUtils.getHtml(invoice, userPerformer)
+        const html = invoiceFormatUtils.InvoiceUtils.getHtml(invoice, userPerformer)
         const filePath = await pdfConverter.convertToPDF(html);
         invoice.invoicePdfPath = filePath; 
 

@@ -166,6 +166,7 @@ class PaymentService {
                     'payments.isDeleted': false
                 }
             },
+            
             {
                 $project: {
                     _id: 1,
@@ -209,6 +210,8 @@ class PaymentService {
                     payments.push(paymentData);
                 }
             }
+
+            payments.sort((a, b) => b.paymentDate - a.paymentDate);
         }
 
             return payments;

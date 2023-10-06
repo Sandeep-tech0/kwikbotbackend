@@ -34,30 +34,12 @@ const completeSubscription = async (req, res) => {
   }
 };
 
-const cancelRenewal = async (req, res) => {
-  try {
-    const { subscriptionID, clientId } = req.body;
-    const data = { subscriptionID, clientId, renewalId };
-    const paypalCancelRenewalResponse = await paypalService.cancelRenewal(data);
-    return Response.success(res, "cancel renewal successfully", {
-      paypalCancelRenewalResponse,
-    });
-  } catch (error) {
-    return Response.error(res, error);
-  }
-};
-
-const webhook = async (req, res) => {
-  const data = req.body;
-  const  webhookResponse = await paypalService.webhook(data)
 
 
-}
+
 
 
 module.exports = {
   performPayPalActions,
   completeSubscription,
-  cancelRenewal,
-  webhook
 };

@@ -1,15 +1,18 @@
 const fs = require('fs');
 const moment = require('moment');
+const numberToWords = require('number-to-words');
 
 class InvoiceUtils {
   static getHtml(invoice, userPerformer) {
     const imageLink = "https://kwikbot.ai/images/kwikbot-bran-logo.png"
     const invoiceDate = moment(invoice.invoiceDate).format("DD MMM YYYY");
-    const GSTamount = invoice.amount * 0.1;
     const totalAmount = invoice.amount
+    const GSTRate = 0.1
+    const GSTamount = totalAmount * GSTRate;
     const AmountInWords = this.convertNumberToWords(totalAmount);
-    const intialAmount = invoice.amount - GSTamount; 
-
+    const intialAmount = (totalAmount / (1 + GSTRate)).toFixed(2);
+     
+ 
 
     return `<!DOCTYPE html>
     <html lang="en">
@@ -75,7 +78,7 @@ class InvoiceUtils {
                        <tr>
                            <td style="padding: 20px; border-bottom: 1px solid #cccc;" colspan="4">
                             <p> <b>${invoice.title}</b> </p>
-                            <p> ${userPerformer.country}</p>
+                            <p>${userPerformer.organizationName}</p>
                             <p>${userPerformer.email}</p>
                            </td>
                        </tr>
@@ -129,71 +132,11 @@ class InvoiceUtils {
   static convertNumberToWords(num) {
     if (num === 0) return "Zero";
 
-    const units = [
-      "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"
-    ];
-
-    const teens = [
-      "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"
-    ];
-
-    const tens = [
-      "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"
-    ];
-
-    const thousands = ["", "Thousand", "Million", "Billion"];
-
-    const numStr = num.toString();
-
-    const getChunkInWords = (chunk) => {
-      let chunkStr = "";
-
-      const hundredDigit = Math.floor(chunk / 100);
-      if (hundredDigit > 0) {
-        chunkStr += units[hundredDigit] + " Hundred";
-        chunk %= 100;
-      }
-
-      if (chunk >= 10 && chunk <= 19) {
-        if (chunkStr !== "") chunkStr += " ";
-        chunkStr += teens[chunk - 10];
-      } else {
-        const tenDigit = Math.floor(chunk / 10);
-        if (tenDigit > 0) {
-          if (chunkStr !== "") chunkStr += " ";
-          chunkStr += tens[tenDigit];
-          chunk %= 10;
-        }
-
-        const unitDigit = chunk % 10;
-        if (unitDigit > 0) {
-          if (chunkStr !== "") chunkStr += " ";
-          chunkStr += units[unitDigit];
-        }
-      }
-
-      return chunkStr;
-    };
-
-    let result = "";
-    let chunkIndex = 0;
-
-    while (num > 0) {
-      const chunk = num % 1000;
-      if (chunk > 0) {
-        const chunkInWords = getChunkInWords(chunk);
-        if (chunkInWords !== "") {
-          if (result !== "") result = chunkInWords + " " + thousands[chunkIndex] + " " + result;
-          else result = chunkInWords + " " + thousands[chunkIndex];
-        }
-      }
-
-      num = Math.floor(num / 1000);
-      chunkIndex++;
-    }
-
-    return result;
+    // Using number-to-words library
+    return numberToWords.toWords(num);
   }
+  
+  
 }
 
 async function saveFile(file) {

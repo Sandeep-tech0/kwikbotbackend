@@ -1,6 +1,5 @@
 const ApiError = require("../middlewares/apiError");
 const Client = require("../models/Client");
-const RenewalService = require("./renewalService");
 const paypalTokenController = require("../middlewares/paypalToken");
 const axios = require("axios");
 
@@ -20,72 +19,32 @@ class SubscriptionPlanService {
       throw ApiError.badRequest("Client Subscription not found");
     }
 
-    if (
-      client.subscriptionPlans.length > 0 &&
-      client.subscriptionPlans[client.subscriptionPlans.length - 1].renewals
-        .length > 0
-    ) {
-      client.subscriptionPlans[
-        client.subscriptionPlans.length - 1
-      ].isRenew = false;
+    // if (
+    //   client.subscriptionPlans.length > 0 &&
+    //   client.subscriptionPlans[client.subscriptionPlans.length - 1].renewals
+    //     .length > 0
+    // ) {
+   
 
-      //for checking subscription is renew or not
-      const renewals =
-        client.subscriptionPlans[client.subscriptionPlans.length - 1].renewals[
-          client.subscriptionPlans[client.subscriptionPlans.length - 1].renewals
-            .length - 1
-        ];
-      if (renewals.nextRenewalDate < new Date()) {
-        client.subscriptionPlans[
-          client.subscriptionPlans.length - 1
-        ].isRenew = true;
-      }
-    }
+    //   //for checking subscription is renew or not
+    //   const renewals =
+    //     client.subscriptionPlans[client.subscriptionPlans.length - 1].renewals[
+    //       client.subscriptionPlans[client.subscriptionPlans.length - 1].renewals
+    //         .length - 1
+    //     ];
+    //   if (renewals.nextRenewalDate < new Date()) {
+    //     client.subscriptionPlans[
+    //       client.subscriptionPlans.length - 1
+    //     ].isRenew = true;
+    //   }
+    // }
 
     return client.subscriptionPlans[client.subscriptionPlans.length - 1];
   }
 
-  async createClientSubscription(userPerformer, clientId, subscription) {
-    /* if (subscription.frequency === 'Monthly') {
-            const currentDate = new Date();
-            subscription.startDate = currentDate;
+  async createClientSubscription(userPerformer, clientId, subscription, renewals) {
 
-            const nextMonthDate = new Date(currentDate);
-            nextMonthDate.setMonth(currentDate.getMonth() + 1);
-
-            subscription.endDate = new Date(nextMonthDate);
-
-            const nextRenewalDate = new Date(currentDate);
-            nextRenewalDate.setMonth(currentDate.getMonth() + 1);
-
-            subscription.nextRenewalDate = new Date(nextRenewalDate);
-        } else if (subscription.frequency === 'Yearly') {
-            const currentDate = new Date();
-
-            subscription.startDate = currentDate;
-
-            const nextYearDate = new Date(currentDate);
-            nextYearDate.setFullYear(currentDate.getFullYear() + 1);
-            subscription.endDate = new Date(nextYearDate);
-
-            const nextRenewalDate = new Date(currentDate);
-            nextRenewalDate.setFullYear(currentDate.getFullYear() + 1);
-            subscription.nextRenewalDate = new Date(nextRenewalDate);
-        } else {
-            throw new Error('Invalid subscription frequency');
-        } 
-
-        const renewal = {
-            renewalDate: subscription.nextRenewalDate,
-            startDate: subscription.startDate,
-            endDate: subscription.endDate,
-            nextRenewalDate: subscription.nextRenewalDate,
-            amount: subscription.amount,
-            GST: subscription.GST || 0,
-            payableAmount: subscription.amount + (subscription.GST || 0),
-            isPaid: false,
-        };*/
-
+console.log("subscription",renewals)
     const subscriptionPlan = {
       planName: subscription.planName,
       frequency: subscription.frequency,
@@ -97,8 +56,13 @@ class SubscriptionPlanService {
       applicableTaxPercentage: subscription.applicableTaxPercentage,
       isTaxApplicable: subscription.isTaxApplicable,
       description: subscription.description,
-      renewals: [],
+      renewals: [renewals],
     };
+
+console.log("subscriptionPlan",subscriptionPlan)
+ 
+
+
 
     //push new  subscription plan in client subscription plan array
     const updatedClient = await Client.findOneAndUpdate(
@@ -129,28 +93,43 @@ class SubscriptionPlanService {
     if (!clientId) {
       throw ApiError.badRequest("Client Id is required");
     }
-    await Client.findOneAndUpdate(
-      {
-        _id: clientId,
-        isDeleted: false,
-        "subscriptionPlans.isActive": true,
-      },
-      {
-        $set: { "subscriptionPlans.$.isActive": false },
-      },
-      { new: true }
-    ); //.select('subscriptionPlans');
+//=== i want to take out the data of the client subscription which is latest and active and full renewalarry of the client latest subscription plan=============
+ const client = await Client.findOne({
+      _id: clientId,
+      isDeleted: false,
+      "subscriptionPlans.isActive": true,
+    })
+      .select("subscriptionPlans")
+      .lean();
+
+  if (!client) {
+    throw ApiError.badRequest("Client not found");
+  }
+
+///===== renewalarry of the client latest subscription plan=============
+  const renewals =
+  client.subscriptionPlans[client.subscriptionPlans.length - 1].renewals[
+    client.subscriptionPlans[client.subscriptionPlans.length - 1].renewals
+      .length - 1
+  ];
+
+
 
     //for creating new subcription
     const newSubcription = await this.createClientSubscription(
       userPerformer,
       clientId,
-      subscriptionPlan
+      subscriptionPlan,
+      renewals
     );
 
     return newSubcription;
   }
 
+
+
+
+  
   async CancelClientSubscription(userPerformer, subcription, clientId ) {
     const client_id = clientId || userPerformer.clientId;
 
@@ -165,36 +144,39 @@ class SubscriptionPlanService {
       }
     );
 
+
     const updatedClient = await Client.findOneAndUpdate(
       {
         _id: client_id,
         isDeleted: false,
         "subscriptionPlans.isActive": true,
-        "subscriptionPlans.renewals._id": subcription.renewal_id, // Assuming you have an identifier for the old renewal
+        "subscriptionPlans.renewals._id": subcription.renewal_id,
       },
       {
         $set: {
-          "subscriptionPlans.$.isCancelled": true,
-          "subscriptionPlans.$.cancellationReason":
-            subcription.cancellationReason,
-          "subscriptionPlans.$.fullReason": subcription.fullReason,
-          "subscriptionPlans.$.cancellationDate": new Date(),
-          "subsciptionPlans.$.isRenew": false,
+          "subscriptionPlans.$[elem].renewals.$[innerRenewal].isCancelled": true,
+          "subscriptionPlans.$[elem].renewals.$[innerRenewal].cancellationDate": new Date(),
+          "subscriptionPlans.$[elem].cancellationReason": subcription.cancellationReason,
+          "subscriptionPlans.$[elem].fullReason": subcription.fullReason,
+          "subscriptionPlans.$[elem].isRenew": false,
         },
       },
-      { new: true }
-    ).select("subscriptionPlans");
+      {
+        new: true,
+        arrayFilters: [
+          { "elem": { $exists: true } },
+          { "innerRenewal._id": subcription.renewal_id },
+        ],
+      }
+    )
+    .select("subscriptionPlans")
+    .lean();
 
     if (!updatedClient) {
       throw ApiError.badRequest("Subscription not found");
     }
-    const cancelledSubcription = await RenewalService.cancelRenewal(
-      userPerformer,
-      subcription.renewal_id,
-      client_id
-    );
 
-    return { cancelResponse: cancelledSubcription, cancelSubscriptionResponse: subscriptionApiResponse.data };
+    return {  cancelSubscriptionResponse: subscriptionApiResponse.data };
   }
 
   async addRenewalafterPayment(userPerformer, subcriptionId, paymentAmount) {

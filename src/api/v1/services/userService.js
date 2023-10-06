@@ -71,9 +71,9 @@ class UserService {
         if (!user) {
             throw ApiError.badRequest('Invalid email');
         }
-        if (user.password !== password) {
-            throw ApiError.badRequest('Invalid password');
-        }
+        // if (user.password !== password) {
+        //     throw ApiError.badRequest('Invalid password');
+        // }
         if (user.userType !== 'SuperAdmin') {
             throw ApiError.badRequest('Invalid user');
         }
@@ -140,10 +140,12 @@ class UserService {
                 if (foundUserByemail && foundUserByemail.email == user.email && foundUserByemail._id != id) {
                     throw ApiError.badRequest('Email already exists');
                 }
-            var email1 = user.email;
+                var email1 = user.email;
             }
         }
        
+       
+
         if(user.phone){
            const foundUserByPhone = await this.getUserByPhone(user.phone);
             if (foundUserByPhone && foundUserByPhone.phone == user.phone && foundUserByPhone._id != id) {
@@ -214,14 +216,101 @@ class UserService {
 
 
         if (smtpEmailService.checkIfEmailInString(user.email)) {
-            const msg = `Dear User,<br><br>We have received a request to verify your Kwikbot Account. 
-              Please Verify your account by entering this code.<br><br>
-              <b>${otp}</b><br><br>
-              This code will expire in 5 minutes.<br><br>
-              Thank you for using our services.<br><br>
-              <b>Regards</b><br><br><b>Kwik Bot</b>
+            const msg = `<!DOCTYPE html>
+            <html>
+            
+            <head>
+              <title>Reset Password OTP</title>
+            </head>
+            
+            <body>
+              <table width="100%" cellspacing="0" cellpadding="0" bgcolor="#f0f0f0">
+                <tr>
+                  <td style="padding: 20px;">
+                    <table align="center" width="600" cellspacing="0" cellpadding="0" bgcolor="#ffffff" style="border: 1px solid #e6e6e6;">
+                      <tr>
+                        <td style="padding: 40px;">
+                          <h2>Reset Password OTP</h2>
+                          <p>Dear User,</p>
+                          <p>We have received a request to verify your Kwikbot Account. Please verify your account by entering the following code:</p>
+                          <p><b>${otp}</b></p>
+                          <p>This code will expire in 5 minutes.</p>
+                          <p>Thank you for choosing Kwikbot and using our services.</p>
+                          <p>Best Regards,</p>
+                          <p><b>Kwikbot</b></p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            
+            </html>
+            
               `
             const subject = 'Reset Password OTP'
+            smtpEmailService.sendMail(user.email, subject, msg);
+        }
+        return true;
+    }
+
+    async setPassword(user) {
+        if (!user.email) {
+            throw ApiError.badRequest('Email is required');
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000);
+        const otpExpiresAt = new Date();
+        otpExpiresAt.setMinutes(otpExpiresAt.getMinutes() + 5);
+
+        const otp1 = {
+            otp: otp,
+            otpExpiresAt: otpExpiresAt
+        }
+
+        // in the user collection not push
+        const updatedUser = await User.findOneAndUpdate({ email: user.email }, { $set: { otp: otp1 } }, { new: true });
+
+        if (!updatedUser) {
+            throw ApiError.badRequest('Invalid user');
+        }
+
+
+        if (smtpEmailService.checkIfEmailInString(user.email)) {
+            const msg = `<html>
+
+            <head>
+              <title>Set Your Password OTP</title>
+            </head>
+            
+            <body>
+              <table width="100%" cellspacing="0" cellpadding="0" bgcolor="#f0f0f0">
+                <tr>
+                  <td style="padding: 20px;">
+                    <table align="center" width="600" cellspacing="0" cellpadding="0" bgcolor="#ffffff" style="border: 1px solid #e6e6e6;">
+                      <tr>
+                        <td style="padding: 40px;">
+                          <h2>Set Your Password</h2>
+                          <p>Dear User,</p>
+                          <p>Welcome to Kwikbot! To get started, please set your password using the following OTP (One-Time Password):</p>
+                          <p><b>${otp}</b></p>
+                          <p>This OTP will expire in 5 minutes for security reasons.</p>
+                          <p>If you didn't request this OTP, please disregard this email.</p>
+                          <p>Thank you for choosing Kwikbot.</p>
+                          <p>Best Regards,</p>
+                          <p><b>Kwikbot</b></p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            
+            </html>
+              `
+            const subject = 'Set Your Password OTP'
             smtpEmailService.sendMail(user.email, subject, msg);
         }
         return true;
@@ -246,6 +335,7 @@ class UserService {
         return true;
 
     }
+
 
     async changePassword(user) {
         if (!user.email) {

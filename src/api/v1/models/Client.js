@@ -147,6 +147,7 @@ const ClientSchema = new mongoose.Schema([
         },
         isRenew: {
           type: Boolean,
+          default: true
         },
         description: [
           {

@@ -48,6 +48,17 @@ async function resetPassword(req, res) {
     return Response.error(res, error);
   }
 }
+
+async function setPassword(req, res) {
+  try {
+    const user = req.body;
+    const updatedUser = await UserService.setPassword(user);
+    return Response.success(res, "OTP Sent", updatedUser);
+  } catch (error) {
+    return Response.error(res, error);
+  }
+}
+
 async function verifyOtp(req, res) {
   try {
     const user = req.body;
@@ -57,6 +68,8 @@ async function verifyOtp(req, res) {
     return Response.error(res, error);
   }
 }
+
+
 
 async function changePassword(req, res) {
   try {
@@ -76,4 +89,5 @@ module.exports = {
   verifyOtp,
   changePassword,
   loginForSuperAdmin,
+  setPassword,
 };

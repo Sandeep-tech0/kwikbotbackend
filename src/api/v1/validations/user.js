@@ -6,8 +6,8 @@ class UserValidation {
             return ApiError.badRequest('User Details are required');
         if (!user.email)
             return ApiError.badRequest('Email is required');
-        if (!user.password)
-            return ApiError.badRequest('Password is required');
+        // if (!user.password)
+        //     return ApiError.badRequest('Password is required');
         if (!user.userType)
             return ApiError.badRequest('Invalid user type');
     }

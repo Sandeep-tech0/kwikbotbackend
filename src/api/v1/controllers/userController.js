@@ -26,7 +26,8 @@ async function getAllUsers(req, res) {
 
 async function updateUser(req, res) {
     try {
-        const id = req.params.id;   
+        const id = req.params.id; 
+        const userPerformer = req.user;
         const user = {
             firstName: req.body.firstName,
             lastName: req.body.lastName,
@@ -34,8 +35,10 @@ async function updateUser(req, res) {
             country: req.body.country,
             profilePic: req.body.profilePic,
             organizationName: req.body.organizationName,
+            email: req.body.email,
+            userType: req.body.userType
         }
-        const updatedUser = await UserService.updateUser(id, user);
+        const updatedUser = await UserService.updateUser(id, user, userPerformer);
         return Response.success(res, "User updated successfully", updatedUser);
     } catch (error) {
         return Response.error(res, error);

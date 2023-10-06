@@ -4,6 +4,7 @@ const axios = require("axios");
 const clientModel = require("../models/Client");
 const invoiceService = require("../services/invoiceService");
 
+
 class paypalSubscriptionService {
   async createPlan(clientId) {
     const clientData = await clientModel
@@ -17,19 +18,21 @@ class paypalSubscriptionService {
   
     try {
       const token = await paypalTokenController.createToken();
+
+      const planCount = clientData.subscriptionPlans.length - 1;
   
       const updatedFrequency =
-        clientData.subscriptionPlans[0].frequency === "Monthly" ? "MONTH" : "YEAR";
+        clientData.subscriptionPlans[planCount].frequency === "Monthly" ? "MONTH" : "YEAR";
   
       const setupfeeValue =
-        clientData.subscriptionPlans[0].isSetUpAmountApplicable === true
-          ? clientData.subscriptionPlans[0].setUpAmount
+        clientData.subscriptionPlans[planCount].isSetUpAmountApplicable === true
+          ? clientData.subscriptionPlans[planCount].setUpAmount
           : 0;
   
       // Define the request data in the correct structure
       const requestData = {
         product_id: "1695106714",
-        name: clientData.subscriptionPlans[0].planName,
+        name: clientData.subscriptionPlans[planCount].planName,
         description: "-",
         status: "ACTIVE",
         billing_cycles: [
@@ -43,7 +46,7 @@ class paypalSubscriptionService {
             total_cycles: 0,
             pricing_scheme: {
               fixed_price: {
-                value: clientData.subscriptionPlans[0].amount,
+                value: clientData.subscriptionPlans[planCount].amount,
                 currency_code: "USD",
               },
             },
@@ -64,7 +67,7 @@ class paypalSubscriptionService {
         },
       };
   
-      console.log("requestData", requestData);
+    
   
       const apiresponse = await axios.post(
         `https://api-m.sandbox.paypal.com/v1/billing/plans`,
@@ -141,10 +144,19 @@ class paypalSubscriptionService {
         endDate = new Date(nextBillingTime.getTime() - oneDayInMilliseconds);
       }
 
+
+const intialAmount =
+subscriptionApiResponse?.data?.billing_info?.last_payment?.amount?.value;
+const setupfeeValue =
+subscriptionPlanDetail?.data?.payment_preferences?.setup_fee?.value;
+const totalAmount =  parseInt(intialAmount) + parseInt(setupfeeValue);
+const totalAmountIncludeGST = parseInt(totalAmount) + (parseInt(totalAmount) * parseInt(subscriptionPlanDetail?.data?.taxes?.percentage)) / 100;
+const GSTamount = (parseInt(totalAmount) * parseInt(subscriptionPlanDetail?.data?.taxes?.percentage)) / 100;
+
+    
       const renewalData = {
         amount:
-          subscriptionPlanDetail?.data?.billing_cycles[0]?.pricing_scheme
-            ?.fixed_price?.value,
+        totalAmountIncludeGST,
         payableAmount:
           subscriptionPlanDetail?.data?.billing_cycles[0]?.pricing_scheme
             ?.fixed_price?.value,
@@ -162,24 +174,24 @@ class paypalSubscriptionService {
         isPaid: true,
         isCancelled: false,
       };
-      const updatedClient = await clientModel
-        .findOneAndUpdate(
-          {
-            _id: clientId,
-            isDeleted: false,
-          },
-          {
-            $push: { "subscriptionPlans.0.renewals": renewalData },
-            $set: { "subscriptionPlans.0.isRenew": true },
-          },
-          { new: true }
-        )
-        .select("subscriptionPlans")
-        .lean();
 
-      if (!updatedClient) {
-        throw new Error("Client not found");
-      }
+const updatedClient = await clientModel
+  .findOneAndUpdate(
+    {
+      _id: clientId,
+      isDeleted: false,
+    },
+    {
+      $push: { "subscriptionPlans.$[elem].renewals": renewalData }, // Update the last element
+      $set: { "subscriptionPlans.$[elem].isRenew": true }, // Update the last element
+    },
+    {
+      new: true,
+      arrayFilters: [{ "elem": { $exists: true } }],
+    }
+  )
+  .select("subscriptionPlans")
+  .lean();
 
       ///////////////=============adding payment data ==========================////////////////////
       const payment = {
@@ -190,8 +202,7 @@ class paypalSubscriptionService {
         paymentMethod: "PayPal",
         paymentDate: orderApiResponse?.data?.create_time,
         amount:
-          subscriptionApiResponse?.data?.billing_info?.last_payment?.amount
-            ?.value,
+        totalAmountIncludeGST,
         GST: subscriptionPlanDetail?.data?.taxes?.percentage,
         currency:
           subscriptionApiResponse?.data?.billing_info?.last_payment?.amount
@@ -200,6 +211,8 @@ class paypalSubscriptionService {
         paymentGateway: "PayPal",
         feeType: "Subscription",
       };
+
+      
  await clientModel
         .findOneAndUpdate(
           { _id: clientId, isDeleted: false },
@@ -212,6 +225,15 @@ class paypalSubscriptionService {
 
       //////////////////////////////////=================invoice===================///////////////////////////
 
+    
+      function generateUniqueInvoiceNumber() {
+        // Generate a unique invoice number with a combination of current year, timestamp, and a random number
+        const currentYear = new Date().getFullYear();
+        const timestamp = new Date().getTime();
+        const randomPart = Math.floor(Math.random() * 1000).toString().padStart(4, '0');
+        return `INV-${currentYear}-${timestamp}-${randomPart}`;
+      }
+
       const invoiceData = {
         client_id: clientId,
         renewal_id:
@@ -219,24 +241,17 @@ class paypalSubscriptionService {
         title: "Subscription Plan",
         ///=== create uniqe invoice number for every invoice  ===///
    invoiceNumber:
-          "INV-" +
-          new Date().getFullYear() +
-          "-" +
-          "00" + new Date().getTime(),
+   generateUniqueInvoiceNumber(),
 
         invoiceDate: new Date(),
         paymentDate: new Date(),
         amount:
-          subscriptionApiResponse?.data?.billing_info?.last_payment?.amount
-            ?.value,
+        totalAmountIncludeGST,
         paidStatus: true,
         GST: subscriptionPlanDetail?.data?.taxes?.percentage,
         email: subscriptionApiResponse?.data?.subscriber?.email_address,
       };
 
-      console.log("invoiceData", invoiceData);
-
-     
       await invoiceService.addInvoice(userPerformer, invoiceData);
 
       return {
@@ -250,53 +265,7 @@ class paypalSubscriptionService {
     }
   }
 
-  async cancelRenewal(data) {
-    try {
-      const { subscriptionID, clientId, renewalId } = data;
-      const token = await paypalTokenController.createToken();
-      const subscriptionApiResponse = await axios.get(
-        `https://api-m.sandbox.paypal.com/v1/billing/subscriptions/${subscriptionID}`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const updatedClient = await clientModel
-        .findOneAndUpdate(
-          {
-            _id: clientId,
-            isDeleted: false,
-            "subscriptionPlans.renewals._id": renewalId,
-          },
-          {
-            $set: {
-              "subscriptionPlans.$.renewals.$[innerRenewal].isCancelled": true,
-              "subscriptionPlans.$.renewals.$[innerRenewal].cancellationDate":
-                new Date(),
-              "subscriptionPlans.$.isRenew": false,
-            },
-          },
-          {
-            new: true,
-            arrayFilters: [{ "innerRenewal._id": renewalId }],
-          }
-        )
-        .select("subscriptionPlans")
-        .lean();
-
-      if (!updatedClient) {
-        throw new Error("Client not found");
-      }
-
-      return subscriptionApiResponse.data;
-    } catch (error) {
-      console.error("Error creating plan:", error);
-      return ApiError.badRequest(error.message);
-    }
-  }
+  
 
   async webhook(data) {
     try {
